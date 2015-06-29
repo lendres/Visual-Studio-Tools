@@ -1,0 +1,28 @@
+
+1) Shorten DPTextCommands.Exec(...).
+Is it possible to add a delegate type for text commands, make an array of delegates for the commands and then just use 
+a loop in Exec to find the command name called and then invoke the delegate from the array.
+
+2) Add images to the Outline toolbar buttons.  Would have to reinstall them everytime in Connect.
+
+3) Move the adding of the commands (AddNamedCommand2 calls) to the DPTextCommands class as a function.  Call this function
+from Connect.
+
+4) Google examples of Visual Studio AddIns and look for an example of how to add a named command and then call it 
+from a toolbar.  I'm going to go out on a limb and suggest the method currently used isn't really the best one.
+
+5) In DPMenus.onListShortcutsInHTML adding a sorting feature and allow the output file to be specified.
+
+6) Modify the formatting in the properties for C#.
+	- In switch statements the body of case statements should be indented to the same level as the case statement
+	  so that when I use {} the line up correctly.
+
+7) Modify the class template to add "// End class" and "// End namespace."
+
+
+Add in location:
+D:\Documents and Settings\endrlana\My Documents\Visual Studio 2008\AddIns
+
+Need to use the commandline switch: /resetaddin VisualStudioTools.Connect
+To cause a reboot of the addin everytime.  Put it in the "Command line arguments:" box in the "Visual Studio
+Tools" project settings.
