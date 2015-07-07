@@ -20,8 +20,20 @@ from a toolbar.  I'm going to go out on a limb and suggest the method currently 
 7) Modify the class template to add "// End class" and "// End namespace."
 
 
+
+To debug, ensure project settings start an external application:
+Open the "Properties" of "Visual Studio Tools."
+Select Debug->Start External Program and browse for devenv.exe in the C:\Program Files (x86)\Microsoft Visual Studio XX.X\Common7\IDE\devenv.exe
+
+Go to:
+C:\Users\lendres\Documents\Visual Studio 2012\AddIns
+And change 
+
 Add in location:
+C:\Users\lendres\Documents\Visual Studio 2012\AddIns
 D:\Documents and Settings\endrlana\My Documents\Visual Studio 2008\AddIns
+
+
 
 Need to use the commandline switch: /resetaddin VisualStudioTools.Connect
 To cause a reboot of the addin everytime.  Put it in the "Command line arguments:" box in the "Visual Studio

@@ -117,8 +117,6 @@
     <Content Include="Notes.txt" />
     <None Include="Resources\CollapseToDefinitions.bmp" />
     <None Include="Resources\StopOutputlining.bmp" />
-    <Content Include="VisualStudioTools - D Drive - For Testing.AddIn" />
-    <Content Include="VisualStudioTools - D Drive - Temp - For Testing.AddIn" />
     <Content Include="VisualStudioTools.AddIn" />
   </ItemGroup>
   <ItemGroup>

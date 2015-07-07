@@ -3,6 +3,7 @@ Imports Microsoft.VisualStudio.CommandBars
 Imports Extensibility
 Imports EnvDTE
 Imports EnvDTE80
+
 Public Class DPTextCommands
 
 	Private _applicationcommands As Commands2
@@ -22,6 +23,7 @@ Public Class DPTextCommands
 		CPointer
 		CurlyBraces
 		SquareBraces
+		FormatVariableDeclarations
 		ReverseEquals
 		Last = ReverseEquals
 		Size = Last
@@ -56,6 +58,7 @@ Public Class DPTextCommands
 			_commandnames(CommandName.CPointer) = "CPointer"
 			_commandnames(CommandName.CurlyBraces) = "CurlyBraces"
 			_commandnames(CommandName.SquareBraces) = "SquareBraces"
+			_commandnames(CommandName.FormatVariableDeclarations) = "FormatVariableDeclarations"
 			_commandnames(CommandName.ReverseEquals) = "ReverseEquals"
 
 			_keyboardmappings(CommandName.PrintDebugMessage) = "Text Editor::Alt+D,Alt+M"
@@ -63,6 +66,7 @@ Public Class DPTextCommands
 			_keyboardmappings(CommandName.CPointer) = "Text Editor::Alt+."
 			_keyboardmappings(CommandName.CurlyBraces) = "Text Editor::Shift+Alt+["
 			_keyboardmappings(CommandName.SquareBraces) = "Text Editor::Alt+["
+			_keyboardmappings(CommandName.FormatVariableDeclarations) = "Text Editor::Alt+\"
 			_keyboardmappings(CommandName.ReverseEquals) = "Text Editor::Alt+="
 
 			_arraysinitialized = True
@@ -85,6 +89,7 @@ Public Class DPTextCommands
 		_applicationcommands.AddNamedCommand2(_addininstance, DPTextCommands.GetCommandName(DPTextCommands.CommandName.CPointer), "->", "Prints a C pointer (->)", True, , Nothing, 1 + 2)
 		_applicationcommands.AddNamedCommand2(_addininstance, DPTextCommands.GetCommandName(DPTextCommands.CommandName.CurlyBraces), "{..}", "Prints a curly braces on separate lines.", True, , Nothing, 1 + 2)
 		_applicationcommands.AddNamedCommand2(_addininstance, DPTextCommands.GetCommandName(DPTextCommands.CommandName.SquareBraces), "[..]", "Prints square braces around the last word before the cursor location.", True, , Nothing, 1 + 2)
+		_applicationcommands.AddNamedCommand2(_addininstance, DPTextCommands.GetCommandName(DPTextCommands.CommandName.FormatVariableDeclarations), "Align Variables", "Aligns the variable names in a selection of variable declarations.", True, , Nothing, 1 + 2)
 		_applicationcommands.AddNamedCommand2(_addininstance, DPTextCommands.GetCommandName(DPTextCommands.CommandName.ReverseEquals), "x=y->y=x", "Swaps the left and right hand sides of an equal sign.", True, , Nothing, 1 + 2)
 	End Sub
 
@@ -174,6 +179,81 @@ Public Class DPTextCommands
 		Catch
 		End Try
 	End Sub
+	Public Sub FormatVariableDeclarations()
+		'Align the variable names in a selection of variable declarations.
+		'Try
+		Dim textdoc As TextDocument = CType(DigPro.Application.ActiveDocument.Object("TextDocument"), TextDocument)
+		Dim objectSelectedText As TextSelection = textdoc.Selection
+
+		Dim maxlinestart As Integer = 0
+		Dim maxlineend As Integer = 0
+
+		Dim lines As String() = objectSelectedText.Text.Split(New Char() {ChrW(10)})
+		Dim numberoflines As Integer = lines.Length
+
+		Dim startsoflines(numberoflines - 1) As String
+		Dim endsoflines(numberoflines - 1) As String
+
+
+		For i As Integer = 0 To numberoflines - 1
+
+			'Select the current line and copy the text to a string.
+			'objectSelectedText.GotoLine(i, True)
+
+			'Copy the line from the selection while remove ending spaces, tabs, carriage returns, and carriage return, line feeds.  The
+			'selection of the lines seems to grab the "return" so we need to remove it.
+			Dim line As String = lines(i).TrimEnd(New Char() {ChrW(10), ChrW(13)})
+
+			If line = "" Then
+				startsoflines(i) = ""
+				endsoflines(i) = ""
+			Else
+				Dim lastspace As Integer = line.LastIndexOf(ChrW(32))
+				Dim lasttab As Integer = line.LastIndexOf(ChrW(9))
+
+				Dim startoflastword As Integer = lastspace
+				If lasttab > lastspace Then
+					startoflastword = lasttab
+				End If
+
+				startsoflines(i) = line.Substring(0, startoflastword)
+				endsoflines(i) = line.Substring(startoflastword + 1, line.Length - startoflastword - 1)
+
+				If startsoflines(i).Length > maxlinestart Then
+					maxlinestart = startsoflines(i).Length
+				End If
+
+				If endsoflines(i).Length > maxlineend Then
+					maxlineend = endsoflines(i).Length
+				End If
+			End If
+		Next
+
+		'Add in spacing between two entries.
+		maxlinestart = maxlinestart + 10
+
+		'http://therightstuff.de/2010/01/24/Visual-Studio-Tip-Setting-Indent-Width-And-TabsSpaces-Quickly-Using-Macros.aspx
+		'http://www.jamesralexander.com/blog/content/visual-studio-toggle-between-leading-tabs-or-spaces-project
+		Dim textEditor As Properties
+		Dim inserttabs As Boolean = CBool(textEditor.Item("InsertTabs").Value)
+		If inserttabs Then
+			CInt(textEditor.Item("TabSize").Value)
+		Else
+			CInt(textEditor.Item("IndentSize").Value)
+		End If
+
+		For i As Integer = 0 To numberoflines - 1
+			If startsoflines(i) = "" Then
+				objectSelectedText.Insert(vbCrLf)
+			Else
+				objectSelectedText.Insert(String.Format("{0, -" + maxlinestart.ToString() + "}{1}" + vbCrLf, startsoflines(i), endsoflines(i)))
+			End If
+		Next
+
+		objectSelectedText.
+		'Catch
+		'End Try
+	End Sub
 
 	Public Sub ReverseEquals()
 		'Swap the left hand side and right hand side pieces of code around an equal sign.  Since the left and right side code might contain
@@ -242,6 +322,12 @@ Public Class DPTextCommands
 
 			If cmmndname = DPTextCommands.GetCommandConnectionString(CommandName.SquareBraces) Then
 				SquareBraces()
+				handled = True
+				Exit Sub
+			End If
+
+			If cmmndname = DPTextCommands.GetCommandConnectionString(CommandName.FormatVariableDeclarations) Then
+				FormatVariableDeclarations()
 				handled = True
 				Exit Sub
 			End If
