@@ -149,7 +149,7 @@ FoundMenu:
 
         'Declare a StreamWriter
         Dim sw As System.IO.StreamWriter
-        sw = New System.IO.StreamWriter("c:\\Visual Studio Shortcuts.html")
+		sw = New System.IO.StreamWriter("c:\\temp\\Visual Studio Shortcuts.html")
 
         'Write the beginning HTML
         WriteHTMLStart(sw)

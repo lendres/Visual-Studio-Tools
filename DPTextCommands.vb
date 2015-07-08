@@ -185,13 +185,30 @@ Public Class DPTextCommands
 		Dim textdoc As TextDocument = CType(DigPro.Application.ActiveDocument.Object("TextDocument"), TextDocument)
 		Dim objectSelectedText As TextSelection = textdoc.Selection
 
+		'http://therightstuff.de/2010/01/24/Visual-Studio-Tip-Setting-Indent-Width-And-TabsSpaces-Quickly-Using-Macros.aspx
+		'http://www.jamesralexander.com/blog/content/visual-studio-toggle-between-leading-tabs-or-spaces-project
+		Dim textEditorProperties As EnvDTE.Properties = GetCurrentLanguageProperties()
+		Dim inserttabs As Boolean = CBool(textEditorProperties.Item("InsertTabs").Value)
+		Dim tabsize As Integer = CInt(textEditorProperties.Item("TabSize").Value)
+
 		Dim maxlinestart As Integer = 0
 		Dim maxlineend As Integer = 0
 
+		'Break the text up into separate lines by splitting the string at the line feed character.
+		'Chr(10): [Line Feed Return] (vbLf)
 		Dim lines As String() = objectSelectedText.Text.Split(New Char() {ChrW(10)})
 		Dim numberoflines As Integer = lines.Length
 
+		'We cannot align things if there is only 1 line.
+		If numberoflines < 2 Then
+			Return
+		End If
+
+		'Extract the prefix we will add in later.
+		Dim lineprefix As String = GetInitialLineString(lines, inserttabs, tabsize)
+
 		Dim startsoflines(numberoflines - 1) As String
+		Dim variablenames(numberoflines - 1) As String
 		Dim endsoflines(numberoflines - 1) As String
 
 
@@ -202,12 +219,24 @@ Public Class DPTextCommands
 
 			'Copy the line from the selection while remove ending spaces, tabs, carriage returns, and carriage return, line feeds.  The
 			'selection of the lines seems to grab the "return" so we need to remove it.
-			Dim line As String = lines(i).TrimEnd(New Char() {ChrW(10), ChrW(13)})
+			Dim line As String = RemoveTrailingWhiteSpaceAndLineReturns(lines(i))
 
 			If line = "" Then
+				'If the line was blank, put in blanks in the output.
 				startsoflines(i) = ""
+				variablenames(i) = ""
 				endsoflines(i) = ""
 			Else
+				'If the line contains an initialization, we will extract it.
+				If line.Contains("=") Then
+					Dim equalsignindex As Integer = line.LastIndexOf("=")
+					endsoflines(i) = line.Substring(equalsignindex, line.Length - equalsignindex)
+					line = line.Substring(0, equalsignindex).TrimEnd()
+				Else
+					endsoflines(i) = ""
+				End If
+
+				'Line wasn't blank, so do the work of parsing the line.
 				Dim lastspace As Integer = line.LastIndexOf(ChrW(32))
 				Dim lasttab As Integer = line.LastIndexOf(ChrW(9))
 
@@ -216,44 +245,155 @@ Public Class DPTextCommands
 					startoflastword = lasttab
 				End If
 
-				startsoflines(i) = line.Substring(0, startoflastword)
-				endsoflines(i) = line.Substring(startoflastword + 1, line.Length - startoflastword - 1)
+				startsoflines(i) = RemoveLeadingWhiteSpace(line.Substring(0, startoflastword))
+				variablenames(i) = line.Substring(startoflastword + 1, line.Length - startoflastword - 1)
 
-				If startsoflines(i).Length > maxlinestart Then
-					maxlinestart = startsoflines(i).Length
+				Dim lengthoflineinspaces As Integer = startsoflines(i).Length
+				If lengthoflineinspaces > maxlinestart Then
+					maxlinestart = lengthoflineinspaces
 				End If
 
-				If endsoflines(i).Length > maxlineend Then
-					maxlineend = endsoflines(i).Length
+				lengthoflineinspaces = NumberOfEquivalentSpaces(variablenames(i), tabsize)
+				If lengthoflineinspaces > maxlineend Then
+					maxlineend = lengthoflineinspaces
 				End If
 			End If
 		Next
 
-		'Add in spacing between two entries.
-		maxlinestart = maxlinestart + 10
+		'This is only used if we are inserting tabs, but we will calculate it here, outside of the for loop so we don't recalculate it on every loop.
+		Dim variabletabposition As Integer = CInt(Math.Floor(maxlinestart / tabsize)) + lineprefix.Length + 3
+		Dim initializationtabposition As Integer = CInt(Math.Floor(maxlineend / tabsize)) + 3
 
-		'http://therightstuff.de/2010/01/24/Visual-Studio-Tip-Setting-Indent-Width-And-TabsSpaces-Quickly-Using-Macros.aspx
-		'http://www.jamesralexander.com/blog/content/visual-studio-toggle-between-leading-tabs-or-spaces-project
-		Dim textEditor As Properties
-		Dim inserttabs As Boolean = CBool(textEditor.Item("InsertTabs").Value)
-		If inserttabs Then
-			CInt(textEditor.Item("TabSize").Value)
-		Else
-			CInt(textEditor.Item("IndentSize").Value)
-		End If
+		'Clear the existing text and move to the start of the line.
+		objectSelectedText.Text = ""
+		objectSelectedText.StartOfLine(vsStartOfLineOptions.vsStartOfLineOptionsFirstColumn)
 
 		For i As Integer = 0 To numberoflines - 1
 			If startsoflines(i) = "" Then
+				'This was a blank line, so we add a blank line back in.
 				objectSelectedText.Insert(vbCrLf)
 			Else
-				objectSelectedText.Insert(String.Format("{0, -" + maxlinestart.ToString() + "}{1}" + vbCrLf, startsoflines(i), endsoflines(i)))
+				If inserttabs Then
+					Dim variabletabsneeded As Integer = variabletabposition - CInt(Math.Floor(startsoflines(i).Length / tabsize))
+					Dim variabletabstring As String = ""
+					For j As Integer = 1 To variabletabsneeded
+						variabletabstring = variabletabstring + vbTab
+					Next
+
+					Dim initializationtabsneeded As Integer = initializationtabposition - CInt(Math.Floor(variablenames(i).Length / tabsize))
+					Dim initializationtabstring As String = ""
+					If endsoflines(i) <> "" Then
+						For j As Integer = 1 To initializationtabsneeded
+							initializationtabstring = initializationtabstring + vbTab
+						Next
+					End If
+
+					objectSelectedText.Insert(lineprefix + startsoflines(i) + variabletabstring + variablenames(i) + initializationtabstring + endsoflines(i) + vbCrLf)
+				Else
+					'Insert the line using spaces only.
+					If endsoflines(i) = "" Then
+						objectSelectedText.Insert(String.Format("{0}{1, -" + (maxlinestart + 10).ToString() + "}{2}" + vbCrLf, lineprefix, startsoflines(i), variablenames(i)))
+					Else
+						objectSelectedText.Insert(String.Format("{0}{1, -" + (maxlinestart + 10).ToString() + "}{2, -" + (maxlineend + 10).ToString() + "}" + vbCrLf, lineprefix, startsoflines(i), variablenames(i), endsoflines(i)))
+					End If
+				End If
+
 			End If
 		Next
 
-		objectSelectedText.
+
 		'Catch
 		'End Try
 	End Sub
+	Private Function GetCurrentLanguageProperties() As EnvDTE.Properties
+		If DigPro.Application.ActiveDocument.Language = "CSharp" Then
+			GetCurrentLanguageProperties = DigPro.Application.Properties("TextEditor", "CSharp")
+		End If
+
+		If DigPro.Application.ActiveDocument.Language = "SQL" Then
+			GetCurrentLanguageProperties = DigPro.Application.Properties("TextEditor", "SQL")
+		End If
+
+		If DigPro.Application.ActiveDocument.Language = "HTML" Then
+			GetCurrentLanguageProperties = DigPro.Application.Properties("TextEditor", "HTML")
+		End If
+
+		If DigPro.Application.ActiveDocument.Language = "JScript" Then
+			GetCurrentLanguageProperties = DigPro.Application.Properties("TextEditor", "JScript")
+		End If
+
+	End Function
+
+	Private Function NumberOfEquivalentSpaces(ByVal line As String, ByVal tabsize As Integer) As Integer
+		'Chr(9):  [Tab]              (vbTab)
+		Dim tablessstring As String = line.Replace(ChrW(9), "")
+		Dim numberoftabs As Integer = line.Length - tablessstring.Length
+		NumberOfEquivalentSpaces = numberoftabs * tabsize + line.Length
+	End Function
+
+	Private Function GetInitialLineString(ByVal lines As String(), ByVal inserttabs As Boolean, ByVal tabsize As Integer) As String
+
+		'Find the first useable line to extract the indentation from.
+		Dim exampleline As String = ""
+		For i As Integer = 0 To lines.Length - 1
+			If lines(i).Trim() <> "" Then
+				If i = 0 Then
+					'First line might not be entirely selected.
+					exampleline = lines(1)
+				Else
+					exampleline = lines(i)
+				End If
+				Exit For
+			End If
+		Next
+
+		If exampleline = "" Then
+			Throw New Exception("No lines contain text.")
+		End If
+
+		Dim firstcharacter As String = exampleline.Substring(0, 1)
+
+		Dim newline As String = RemoveTrailingWhiteSpaceAndLineReturns(exampleline)
+		Dim totallength As Integer = newline.Length
+		newline = RemoveLeadingWhiteSpace(newline)
+		Dim whitespacelength As Integer = totallength - newline.Length
+
+		'Convert between tabs and spaces, if required.
+		If inserttabs Then
+			'If we are inserting TABS, but the line started with spaces, we need to convert the spaces
+			'to an equivalent tab size.
+			If firstcharacter = " " Then
+				whitespacelength = CInt(Math.Ceiling(whitespacelength / tabsize))
+				firstcharacter = vbTab
+			End If
+		Else
+			'If we are inserting SPACES, but the line started with spaces, we need to convert the tabs
+			'to an equivalent space size.
+			If firstcharacter = vbTab Then
+				whitespacelength = whitespacelength * tabsize
+				firstcharacter = " "
+			End If
+		End If
+
+		'Add in the number of preceding white space characters required.
+		GetInitialLineString = ""
+		For i As Integer = 1 To whitespacelength
+			GetInitialLineString = GetInitialLineString + firstcharacter
+		Next
+
+	End Function
+	Private Function RemoveTrailingWhiteSpaceAndLineReturns(ByVal line As String) As String
+		'ChrW(9):  [Tab]              (vbTab)
+		'ChrW(10): [Line Feed Return] (vbLf)
+		'ChrW(13): [Carriage Return]  (vbCr)
+		'ChrW(32): [Space]
+		RemoveTrailingWhiteSpaceAndLineReturns = line.TrimEnd(New Char() {ChrW(9), ChrW(10), ChrW(13), ChrW(32)})
+	End Function
+	Private Function RemoveLeadingWhiteSpace(ByVal line As String) As String
+		'ChrW(9):  [Tab]              (vbTab)
+		'ChrW(32): [Space]
+		RemoveLeadingWhiteSpace = line.TrimStart(New Char() {ChrW(9), ChrW(32)})
+	End Function
 
 	Public Sub ReverseEquals()
 		'Swap the left hand side and right hand side pieces of code around an equal sign.  Since the left and right side code might contain
