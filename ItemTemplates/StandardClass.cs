@@ -7,19 +7,19 @@ namespace $rootnamespace$
 	/// </summary>
 	public class $safeitemrootname$
 	{
-		#region Enumerations.
+		#region Enumerations
 
 
 
 		#endregion
 
-		#region Members / Variables / Delegates.
+		#region Members / Variables / Delegates
 
 
 
 		#endregion
 
-		#region Construction.
+		#region Construction
 
 		/// <summary>
 		/// Default constructor.
@@ -28,19 +28,19 @@ namespace $rootnamespace$
 
 		#endregion
 
-		#region Properties.
+		#region Properties
 
 
 
 		#endregion
 
-		#region Functions.
+		#region Functions
 
 
 
 		#endregion
 
-		#region XML.
+		#region XML
 
 
 
