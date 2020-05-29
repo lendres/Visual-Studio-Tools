@@ -48,3 +48,5 @@ bin/
 obj/
 *.pdb
 TestResults/
+.vs/Visual Studio Tools/v15/Server/sqlite3/storage.ide
+.vs/Visual Studio Tools/v15/Server/sqlite3/db.lock
